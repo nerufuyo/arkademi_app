@@ -1,6 +1,7 @@
 import 'package:arkademi_app/config/routes.dart';
 import 'package:arkademi_app/domain/bloc/courses/courses_bloc.dart';
 import 'package:arkademi_app/injection.dart' as di;
+import 'package:arkademi_app/presentation/screens/course_screen.dart';
 import 'package:arkademi_app/presentation/screens/splash_screen.dart';
 import 'package:dotenv/dotenv.dart';
 import 'package:flutter/material.dart';
