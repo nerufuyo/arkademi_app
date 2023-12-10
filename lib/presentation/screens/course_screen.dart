@@ -28,11 +28,11 @@ class CourseScreen extends StatefulWidget {
 class _CourseScreenState extends State<CourseScreen> {
   SecureStorage secureStorage = SecureStorage();
   TrafficManager trafficManager = TrafficManager();
+  VlcPlayerController? videoPlayerController;
 
-  late VlcPlayerController videoPlayerController;
   final List<Map<String, dynamic>> courseLocal = [];
   final String tempVideoOnline =
-      'https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4';
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
   bool? isOfflineVideoExists;
   String? currentCourseTitle;
@@ -47,15 +47,15 @@ class _CourseScreenState extends State<CourseScreen> {
 
   @override
   void dispose() {
-    videoPlayerController.dispose();
-    videoPlayerController.startRendererScanning();
+    videoPlayerController!.dispose();
+    videoPlayerController!.stopRendererScanning();
     super.dispose();
   }
 
   void _initializeState() async {
     _fetchData();
-    _initializeVideoPlayer();
     _loadStorage();
+    _initializeVideoPlayer();
   }
 
   void _fetchData() async {
@@ -63,12 +63,21 @@ class _CourseScreenState extends State<CourseScreen> {
   }
 
   void _initializeVideoPlayer() {
-    videoPlayerController = VlcPlayerController.network(
-      tempVideoOnline,
-      autoPlay: false,
-      hwAcc: HwAcc.full,
-      options: VlcPlayerOptions(),
-    );
+    if (isOfflineVideoExists == true) {
+      videoPlayerController = VlcPlayerController.file(
+        File(currentCourseVideoUrl ?? ''),
+        autoPlay: false,
+        hwAcc: HwAcc.full,
+        options: VlcPlayerOptions(),
+      );
+    } else {
+      videoPlayerController = VlcPlayerController.network(
+        currentCourseVideoUrl ?? tempVideoOnline,
+        autoPlay: false,
+        hwAcc: HwAcc.full,
+        options: VlcPlayerOptions(),
+      );
+    }
   }
 
   void _loadStorage() async {
@@ -88,7 +97,7 @@ class _CourseScreenState extends State<CourseScreen> {
     });
 
     if (!keyExists) {
-      videoPlayerController.pause();
+      videoPlayerController!.pause();
       courseLocal.add({
         'key': courseData.key,
         'title': courseData.title,
@@ -130,6 +139,7 @@ class _CourseScreenState extends State<CourseScreen> {
     bool keyExists = courseLocal.any((element) {
       return element['key'] == courseData.key;
     });
+    print('Course Current Video: $currentCourseVideoUrl');
 
     if (keyExists) {
       isOfflineVideoExists = await File(
@@ -177,14 +187,7 @@ class _CourseScreenState extends State<CourseScreen> {
                     height: MediaQuery.of(context).size.height / 3,
                     child: VlcPlayer(
                       aspectRatio: 16 / 9,
-                      controller: isOfflineVideoExists == true
-                          ? VlcPlayerController.file(
-                              File(currentCourseVideoUrl!),
-                              autoPlay: true,
-                              hwAcc: HwAcc.full,
-                              options: VlcPlayerOptions(),
-                            )
-                          : videoPlayerController,
+                      controller: videoPlayerController!,
                       virtualDisplay: false,
                       placeholder: Container(
                         color: Colors.black,
@@ -199,22 +202,22 @@ class _CourseScreenState extends State<CourseScreen> {
                         onPressed: () {
                           switch (index) {
                             case 0:
-                              videoPlayerController.seekTo(Duration.zero);
+                              videoPlayerController!.seekTo(Duration.zero);
                               break;
                             case 1:
-                              videoPlayerController.play();
+                              videoPlayerController!.play();
                               break;
                             case 2:
-                              videoPlayerController.pause();
+                              videoPlayerController!.pause();
                               break;
                             case 3:
-                              videoPlayerController.seekTo(
-                                videoPlayerController.value.position +
+                              videoPlayerController!.seekTo(
+                                videoPlayerController!.value.position +
                                     const Duration(seconds: 10),
                               );
                               break;
                             default:
-                              videoPlayerController.play();
+                              videoPlayerController!.play();
                           }
                         },
                         icon: Icon(

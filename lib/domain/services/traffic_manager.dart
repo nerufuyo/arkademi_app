@@ -26,6 +26,12 @@ class TrafficManager {
         onReceiveProgress: (receivedBytes, totalBytes) {
           double progress = (receivedBytes / totalBytes) * 100;
           print('progress: ${progress.toStringAsFixed(0)}%');
+          print('receivedBytes: $receivedBytes/$totalBytes');
+
+          if (progress == 100) {
+            Navigator.of(context).pop();
+            Navigator.of(context).pop();
+          }
 
           // Show the progress value in the progress dialog
           progressDialog.show(
