@@ -10,8 +10,9 @@ BottomSheet bottomSheetWidget({
   return BottomSheet(
     onClosing: () {},
     builder: (context) {
-      return SizedBox(
+      return Container(
         height: 60,
+        color: AppColors().white,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(
