@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:arkademi_app/config/theme.dart';
-import 'package:arkademi_app/domain/services/encryption.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -52,7 +51,6 @@ class TrafficManager {
       Directory? externalDirectory = await getApplicationDocumentsDirectory();
       String filePath = '${externalDirectory.path}/$fileName';
       await File(filePath).writeAsBytes(fileData);
-      print(filePath);
 
       // Save the downloaded encrypted file
       // await EncryptionHelper().saveEncryptedFile(

@@ -6,7 +6,6 @@ import 'dart:io';
 import 'package:arkademi_app/config/theme.dart';
 import 'package:arkademi_app/domain/bloc/courses/courses_bloc.dart';
 import 'package:arkademi_app/domain/services/constant.dart';
-import 'package:arkademi_app/domain/services/encryption.dart';
 import 'package:arkademi_app/domain/services/formatted.dart';
 import 'package:arkademi_app/domain/services/storage.dart';
 import 'package:arkademi_app/domain/services/traffic_manager.dart';
@@ -35,6 +34,7 @@ class _CourseScreenState extends State<CourseScreen> {
 
   bool? isOfflineVideoExists;
   String? currentCourseTitle;
+  String? currentCourseSubtitle;
   String? currentCourseProgress;
   String? currentCourseVideoUrl;
 
@@ -134,12 +134,12 @@ class _CourseScreenState extends State<CourseScreen> {
     bool keyExists = courseLocal.any((element) {
       return element['key'] == courseData.key;
     });
+    currentCourseSubtitle = courseData.title;
 
     if (!keyExists) {
       isOfflineVideoExists = false;
       currentCourseVideoUrl = courseData.onlineVideoLink;
       playVideo(currentCourseVideoUrl!);
-      print('Play Online Video');
       return;
     }
 
@@ -176,7 +176,6 @@ class _CourseScreenState extends State<CourseScreen> {
         // Play Unencrypted Video
         currentCourseVideoUrl = filePath;
         playVideo(currentCourseVideoUrl!);
-        print('Play Offline Video');
       }
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -196,7 +195,9 @@ class _CourseScreenState extends State<CourseScreen> {
       videoPlayerController.setMediaFromFile(File(videoUrl));
     }
 
-    videoPlayerController.play();
+    Future.delayed(const Duration(seconds: 3), () {
+      videoPlayerController.play();
+    });
   }
 
   @override
@@ -227,6 +228,8 @@ class _CourseScreenState extends State<CourseScreen> {
           return [
             SliverToBoxAdapter(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   Container(
                     width: MediaQuery.of(context).size.width,
@@ -277,6 +280,19 @@ class _CourseScreenState extends State<CourseScreen> {
                                       : Icons.skip_next_rounded,
                           color: AppColors().primary,
                         ),
+                      ),
+                    ),
+                  ),
+                  Visibility(
+                    visible: currentCourseSubtitle != null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        currentCourseSubtitle ?? 'Memuat...',
+                        style: AppTypographies().headline6,
                       ),
                     ),
                   ),
