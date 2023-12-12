@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:arkademi_app/config/theme.dart';
 import 'package:arkademi_app/domain/bloc/courses/courses_bloc.dart';
 import 'package:arkademi_app/domain/services/constant.dart';
+import 'package:arkademi_app/domain/services/encryption.dart';
 import 'package:arkademi_app/domain/services/formatted.dart';
 import 'package:arkademi_app/domain/services/storage.dart';
 import 'package:arkademi_app/domain/services/traffic_manager.dart';
@@ -28,11 +29,9 @@ class CourseScreen extends StatefulWidget {
 class _CourseScreenState extends State<CourseScreen> {
   SecureStorage secureStorage = SecureStorage();
   TrafficManager trafficManager = TrafficManager();
-  VlcPlayerController? videoPlayerController;
 
   final List<Map<String, dynamic>> courseLocal = [];
-  final String tempVideoOnline =
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+  late VlcPlayerController videoPlayerController;
 
   bool? isOfflineVideoExists;
   String? currentCourseTitle;
@@ -47,8 +46,8 @@ class _CourseScreenState extends State<CourseScreen> {
 
   @override
   void dispose() {
-    videoPlayerController!.dispose();
-    videoPlayerController!.stopRendererScanning();
+    videoPlayerController.dispose();
+    videoPlayerController.stopRendererScanning();
     super.dispose();
   }
 
@@ -63,21 +62,15 @@ class _CourseScreenState extends State<CourseScreen> {
   }
 
   void _initializeVideoPlayer() {
-    if (isOfflineVideoExists == true) {
-      videoPlayerController = VlcPlayerController.file(
-        File(currentCourseVideoUrl ?? ''),
-        autoPlay: false,
-        hwAcc: HwAcc.full,
-        options: VlcPlayerOptions(),
-      );
-    } else {
-      videoPlayerController = VlcPlayerController.network(
-        currentCourseVideoUrl ?? tempVideoOnline,
-        autoPlay: false,
-        hwAcc: HwAcc.full,
-        options: VlcPlayerOptions(),
-      );
-    }
+    videoPlayerController = VlcPlayerController.network(
+      currentCourseVideoUrl.toString(),
+      autoPlay: false,
+      autoInitialize: true,
+      hwAcc: HwAcc.full,
+      options: VlcPlayerOptions(
+        advanced: VlcAdvancedOptions([VlcAdvancedOptions.networkCaching(2000)]),
+      ),
+    );
   }
 
   void _loadStorage() async {
@@ -86,7 +79,6 @@ class _CourseScreenState extends State<CourseScreen> {
     secureStorage.getJsonFromSecureStorage('courseVideo').then((value) {
       setState(() {
         courseLocal.addAll(value);
-        print('Loaded from local storage: $courseLocal');
       });
     });
   }
@@ -97,7 +89,7 @@ class _CourseScreenState extends State<CourseScreen> {
     });
 
     if (!keyExists) {
-      videoPlayerController!.pause();
+      videoPlayerController.pause();
       courseLocal.add({
         'key': courseData.key,
         'title': courseData.title,
@@ -108,11 +100,14 @@ class _CourseScreenState extends State<CourseScreen> {
       await trafficManager
           .downloadFile(
             context: context,
-            fileName: '${courseData.key}',
-            fileUrl: tempVideoOnline,
+            fileName: '${courseData.key}.mp4',
+            fileUrl: courseData.offlineVideoLink,
+            encryptionKey: Secrets.encryptionKey,
           )
-          .then((value) => secureStorage.saveJsonToSecureStorage(
-              'courseVideo', courseLocal));
+          .then(
+            (value) => secureStorage.saveJsonToSecureStorage(
+                'courseVideo', courseLocal),
+          );
     }
 
     if (keyExists) {
@@ -135,22 +130,73 @@ class _CourseScreenState extends State<CourseScreen> {
   }
 
   void _playSelectedCourse(courseData) async {
-    Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
+    Directory? externalDirectory = await getApplicationDocumentsDirectory();
     bool keyExists = courseLocal.any((element) {
       return element['key'] == courseData.key;
     });
-    print('Course Current Video: $currentCourseVideoUrl');
 
-    if (keyExists) {
-      isOfflineVideoExists = await File(
-        '${appDocumentsDirectory.path}/${courseData.key}.mp4',
-      ).exists();
-      print('Video exists in local storage: $currentCourseVideoUrl');
-    } else {
+    if (!keyExists) {
       isOfflineVideoExists = false;
       currentCourseVideoUrl = courseData.onlineVideoLink;
-      print('Video does not exist in local storage');
+      playVideo(currentCourseVideoUrl!);
+      print('Play Online Video');
+      return;
     }
+
+    try {
+      String filePath = '${externalDirectory.path}/${courseData.key}.mp4';
+      isOfflineVideoExists = await File(filePath).exists();
+
+      if (isOfflineVideoExists == true) {
+        // Play Encrypted Video
+        // if (currentCourseVideoUrl != null) {
+        //   EncryptionHelper().encryptFileInLocal(
+        //     filePath: currentCourseVideoUrl!,
+        //     secretKey: Secrets.encryptionKey,
+        //   );
+        // }
+        // String? decryptedFilePath = await EncryptionHelper().loadDecryptedFile(
+        //   filePath: filePath,
+        //   encryptionKey: Secrets.encryptionKey,
+        // );
+
+        // if (decryptedFilePath != null) {
+        //   currentCourseVideoUrl = decryptedFilePath;
+        //   playVideo(currentCourseVideoUrl!);
+        //   print('Play Offline Video');
+        // } else {
+        //   ScaffoldMessenger.of(context).showSnackBar(
+        //     const SnackBar(
+        //       content: Text('Video decryption failed!'),
+        //       backgroundColor: Colors.red,
+        //     ),
+        //   );
+        // }
+
+        // Play Unencrypted Video
+        currentCourseVideoUrl = filePath;
+        playVideo(currentCourseVideoUrl!);
+        print('Play Offline Video');
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          // Handle file not found or other errors
+          content: Text('Error: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void playVideo(String videoUrl) {
+    if (isOfflineVideoExists == false) {
+      videoPlayerController.setMediaFromNetwork(videoUrl);
+    } else {
+      videoPlayerController.setMediaFromFile(File(videoUrl));
+    }
+
+    videoPlayerController.play();
   }
 
   @override
@@ -182,12 +228,13 @@ class _CourseScreenState extends State<CourseScreen> {
             SliverToBoxAdapter(
               child: Column(
                 children: [
-                  SizedBox(
+                  Container(
                     width: MediaQuery.of(context).size.width,
                     height: MediaQuery.of(context).size.height / 3,
+                    color: Colors.black,
                     child: VlcPlayer(
                       aspectRatio: 16 / 9,
-                      controller: videoPlayerController!,
+                      controller: videoPlayerController,
                       virtualDisplay: false,
                       placeholder: Container(
                         color: Colors.black,
@@ -202,22 +249,22 @@ class _CourseScreenState extends State<CourseScreen> {
                         onPressed: () {
                           switch (index) {
                             case 0:
-                              videoPlayerController!.seekTo(Duration.zero);
+                              videoPlayerController.seekTo(Duration.zero);
                               break;
                             case 1:
-                              videoPlayerController!.play();
+                              videoPlayerController.play();
                               break;
                             case 2:
-                              videoPlayerController!.pause();
+                              videoPlayerController.pause();
                               break;
                             case 3:
-                              videoPlayerController!.seekTo(
-                                videoPlayerController!.value.position +
+                              videoPlayerController.seekTo(
+                                videoPlayerController.value.position +
                                     const Duration(seconds: 10),
                               );
                               break;
                             default:
-                              videoPlayerController!.play();
+                              videoPlayerController.play();
                           }
                         },
                         icon: Icon(

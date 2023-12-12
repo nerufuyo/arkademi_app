@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:arkademi_app/config/theme.dart';
+import 'package:arkademi_app/domain/services/encryption.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -13,65 +14,53 @@ class TrafficManager {
   Future<void> downloadFile({
     required String fileUrl,
     required String fileName,
+    required String encryptionKey,
     required context,
   }) async {
     ProgressDialog progressDialog = ProgressDialog(context: context);
 
     try {
-      progressDialog.show();
+      progressDialog.show(
+        msgColor: AppColors().white,
+        msg: 'Mohon tunggu..',
+        barrierDismissible: false,
+        backgroundColor: AppColors().primary,
+        hideValue: true,
+        progressBgColor: Colors.grey[300]!,
+        progressValueColor: AppColors().success,
+        progressType: ProgressType.valuable,
+        completed: Completed(
+          completedMsg: 'Selesai!',
+        ),
+      );
 
       Response<List<int>> response = await dio.get<List<int>>(
         fileUrl,
         options: Options(responseType: ResponseType.bytes),
         onReceiveProgress: (receivedBytes, totalBytes) {
           double progress = (receivedBytes / totalBytes) * 100;
-          print('progress: ${progress.toStringAsFixed(0)}%');
-          print('receivedBytes: $receivedBytes/$totalBytes');
-
-          if (progress == 100) {
-            Navigator.of(context).pop();
-            Navigator.of(context).pop();
-          }
-
-          // Show the progress value in the progress dialog
-          progressDialog.show(
-            barrierDismissible: false,
-            elevation: 5,
-            msg: 'Mohon tunggu..',
-            completed: Completed(
-              completedMsg: 'Video berhasil diunduh!',
-              completionDelay: 500,
-            ),
-            msgColor: AppColors().white,
-            valueColor: AppColors().white,
-            hideValue: true,
-            backgroundColor: AppColors().primary,
-            progressBgColor: Colors.grey.shade300,
-            progressValueColor: AppColors().success,
-            progressType: ProgressType.valuable,
-          );
-
-          // Update the progress dialog
           progressDialog.update(
             value: int.parse(progress.toStringAsFixed(0)),
             msg: 'Mengunduh video..',
           );
         },
       );
+
       Uint8List fileData = Uint8List.fromList(response.data!);
 
-      // Get the application documents directory
-      Directory appDocumentsDirectory =
-          await getApplicationDocumentsDirectory();
-      String savePath = '${appDocumentsDirectory.path}/$fileName';
+      // Save the downloaded file without encryption
+      Directory? externalDirectory = await getApplicationDocumentsDirectory();
+      String filePath = '${externalDirectory.path}/$fileName';
+      await File(filePath).writeAsBytes(fileData);
+      print(filePath);
 
-      // Save the data to a file
-      File file = File(savePath);
-      await file.writeAsBytes(fileData);
-      print('File saved at $savePath');
-
-      // Close the progress dialog
-      progressDialog.close();
+      // Save the downloaded encrypted file
+      // await EncryptionHelper().saveEncryptedFile(
+      //   context,
+      //   fileName: fileName,
+      //   fileData: fileData,
+      //   encryptionKey: encryptionKey,
+      // );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -80,12 +69,10 @@ class TrafficManager {
             style: AppTypographies().caption.copyWith(color: AppColors().white),
           ),
           backgroundColor: AppColors().success,
+          duration: const Duration(seconds: 3),
         ),
       );
     } catch (error) {
-      // Close the progress dialog on error
-      progressDialog.close();
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -95,15 +82,16 @@ class TrafficManager {
           backgroundColor: AppColors().error,
         ),
       );
+    } finally {
+      progressDialog.close();
     }
   }
 
   void deleteFile(context, {required String fileName}) async {
     try {
       // Get the application documents directory
-      Directory appDocumentsDirectory =
-          await getApplicationDocumentsDirectory();
-      String filePath = '${appDocumentsDirectory.path}/$fileName';
+      Directory? externalDirectory = await getApplicationDocumentsDirectory();
+      String filePath = '${externalDirectory.path}/$fileName';
 
       File file = File(filePath);
 

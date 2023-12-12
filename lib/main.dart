@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
       providers: [
         BlocProvider(create: (context) => di.locator<CoursesBloc>()),
       ],
-      child: MaterialApp(
+      child: MaterialApp( 
         debugShowCheckedModeBanner: false,
         title: 'Arkademi App',
         initialRoute: Routes.splash,
